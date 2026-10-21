@@ -20,8 +20,9 @@ description: 在 mugsun 各仓库提交和推送代码：写 Conventional Commit
 - 提交信息用 Conventional Commits：`<type>(<scope>): <主题>`，type 和 scope 用英文小写，主题用中文，不超过 50 字，句末不加句号，不用 emoji。
 - type 取值：`feat`、`fix`、`perf`、`refactor`、`docs`、`test`、`build`、`ci`、`chore`、`revert`。破坏性变更在 type 后加 `!`，脚注写 `BREAKING CHANGE:`。
 - 一个提交只做一件事，不相关的改动拆开。
+- 提交身份：作者和提交者一律是 `Mugsun <100790155+mugsun@users.noreply.github.com>`。用 `git -c user.name=Mugsun -c user.email=100790155+mugsun@users.noreply.github.com commit`，或者在自己的 worktree 里设仓库级 config。不要改机器的全局 git 配置；已在 main 上的历史不改写。
 - CHANGELOG 写在 `## [Unreleased]` 下对应分组里，每行不超过 80 字。
-- 推送：本地跑过测试和检查后普通推送到 main，推送后用 `gh run list --commit <sha>` 确认全绿；main 已前移时先 merge `origin/main`，在本地重跑检查后再推。禁止 force push，禁止 `--no-verify`。
+- 推送：先普通推送到同名远端分支，用 `gh run list --commit <sha>` 确认该 SHA 的同名必需检查全绿，再快进到 main。main 已前移时先 merge `origin/main`，merge 出的新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
 
 ## 不适用于
 
@@ -36,7 +37,8 @@ description: 在 mugsun 各仓库提交和推送代码：写 Conventional Commit
 3. 如果改了数据库：确认没有动已发布清单里的迁移；新迁移三套方言同号；本地跑一次已发布迁移校验脚本。
 4. 更新 CHANGELOG：每行不超过 80 字，写清用户能看到的变化，不复述 diff。
 5. 写提交信息并提交，跑一遍该仓库的测试命令。
-6. 推送：本地跑过测试和检查后普通推送到 main，推送后用 `gh run list --commit <sha>` 确认全绿；main 已前移时先 merge `origin/main`，在本地重跑检查后再推。禁止 force push，禁止 `--no-verify`。
+6. 推送前用 `git log --format='%h %an <%ae> | %cn <%ce>' origin/main..HEAD` 确认身份都是 noreply；不是的话，在还没推送时用 noreply 身份重做提交。
+7. 推送：先普通推送到同名远端分支，用 `gh run list --commit <sha>` 确认同名必需检查全绿，再快进到 main。main 已前移时先 merge `origin/main`，新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
 
 ## 产出
 
