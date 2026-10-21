@@ -1,0 +1,95 @@
+# 最小 CI：gitleaks 全历史 + markdown 链接检查
+# 共享门禁（mugsun/.github）就绪后改为引用共享 workflow。
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 1 * * *" # 每日 09:17（UTC+8）
+
+concurrency:
+  # main 按 SHA 单独分组且不取消，保证每个 SHA 都留下检查记录（ci-checklist 3.16/3.17）
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks (full history)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install gitleaks (pinned, sha256 verified)
+        run: |
+          set -euo pipefail
+          f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$f"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan full git history
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/gitleaks" git --log-opts="--all" --redact --no-banner --exit-code 1 .
+
+  links:
+    name: markdown links
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # 自行下载 lychee 并校验 sha256（ci-checklist 3.7），不用 lychee-action，避免隐式传 GITHUB_TOKEN
+      - name: Install lychee (pinned, sha256 verified)
+        env:
+          LYCHEE_VERSION: 0.24.2
+          LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
+        run: |
+          set -euo pipefail
+          f="lychee-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/$f"
+          echo "${LYCHEE_SHA256}  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP" --strip-components=1 lychee-x86_64-unknown-linux-gnu/lychee
+      - name: Check markdown links
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=(./**/*.md)
+          if [ ${#files[@]} -eq 0 ]; then echo "::error::没有找到 markdown 文件"; exit 1; fi
+          "$RUNNER_TEMP/lychee" --config lychee.toml --no-progress "${files[@]}"
+
+  notify-schedule-failure:
+    name: open issue on scheduled failure
+    needs: [gitleaks, links]
+    if: (failure() || cancelled()) && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = '每日 CI 定时扫描失败';
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `定时运行失败或被取消：${url}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', per_page: 100 });
+            const hit = issues.find(i => !i.pull_request && i.title === title);
+            if (hit) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: hit.number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body });
+            }

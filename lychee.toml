@@ -1,0 +1,14 @@
+# lychee 链接检查配置（CI 用 --config lychee.toml）
+max_retries = 3
+timeout = 20
+accept = ["200..=299", "429"]
+
+# 排除原因：
+# - mugsun 私有仓（uniappx-ui、uniappx-sdk）匿名访问返回 404，属需登录链接。
+# - localhost/127.0.0.1 为本地开发示例地址。
+# - .git 结尾的 clone 地址不是网页。
+exclude = [
+  '^https://github\.com/mugsun/mugsun-uniappx-(ui|sdk)',
+  '^https?://(localhost|127\.0\.0\.1)',
+  '\.git$',
+]
