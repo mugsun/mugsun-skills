@@ -22,7 +22,12 @@ description: 在 mugsun 各仓库提交和推送代码：写 Conventional Commit
 - 一个提交只做一件事，不相关的改动拆开。
 - 提交身份：作者和提交者用 `mugsun <bydongxin@gmail.com>`，不再强制 noreply。用 `git -c user.name=mugsun -c user.email=bydongxin@gmail.com commit`，或者在自己的 worktree 里设仓库级 config。不要改机器的全局 git 配置；已经推送的历史不改写。身份不符不判阻塞，审查时仅提示。
 - CHANGELOG 写在 `## [Unreleased]` 下对应分组里，每行不超过 80 字。
-- 推送：先普通推送到同名远端分支，用 `gh run list --commit <sha>` 确认该 SHA 的同名必需检查全绿，再快进到 main。main 已前移时先 merge `origin/main`，merge 出的新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
+- 推送：一律写全 refspec，先 `git push origin <完整 SHA>:refs/heads/<分支>` 推到同名远端分支，用 `gh run list --commit <完整 SHA>` 确认该 SHA 的同名必需检查全绿，再用 `git push origin <完整 SHA>:refs/heads/main` 快进到 main。main 已前移时先 merge `origin/main`，merge 出的新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
+- 推 main 前的防误推（清单 3.20）：
+  - 推 main 前，必须核对这个完整 SHA 已经审过，并用 `gh run list --commit <完整 SHA>` 确认全绿。用短 SHA 查可能返回空结果，不能算核对过。
+  - 推送一律写全 refspec：`git push origin <sha>:refs/heads/<分支>`。不要用裸 `git push`，也不要依赖 upstream 跟踪。
+  - 还没审的本地提交，不要放在跟踪 `origin/main` 的分支上。新建分支用 `git switch -c <分支> --no-track origin/main`。
+  - 改到 `.github/` 的提交，必须先有安全官签字，才能进 main。
 
 ## 不适用于
 
@@ -38,7 +43,7 @@ description: 在 mugsun 各仓库提交和推送代码：写 Conventional Commit
 4. 更新 CHANGELOG：每行不超过 80 字，写清用户能看到的变化，不复述 diff。
 5. 写提交信息并提交，跑一遍该仓库的测试命令。
 6. 推送前用 `git log --format='%h %an <%ae> | %cn <%ce>' origin/main..HEAD` 确认身份是 `mugsun <bydongxin@gmail.com>`；不是的话，还没推送时可以用这个身份重做，已推送的不改。
-7. 推送：先普通推送到同名远端分支，用 `gh run list --commit <sha>` 确认同名必需检查全绿，再快进到 main。main 已前移时先 merge `origin/main`，新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
+7. 推送：用 `git push origin <完整 SHA>:refs/heads/<分支>` 推到同名远端分支，用 `gh run list --commit <完整 SHA>` 确认同名必需检查全绿，核对该 SHA 已经审过（改到 `.github/` 的还要有安全官签字），再用 `git push origin <完整 SHA>:refs/heads/main` 快进到 main。main 已前移时先 merge `origin/main`，新 SHA 也要先在分支上跑绿。合入后删掉远端分支。禁止 force push，禁止 `--no-verify`。
 
 ## 产出
 
